@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ZERO zlib64 Encoder — Neon UI</title>
+
+  <!-- pako for zlib (deflate) -->
+  <script src="https://unpkg.com/pako@2.1.0/dist/pako.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b0e11;
+      --panel:#0f1416;
+      --glow1:#00f6b0;
+      --glow2:#00d3b0;
+      --muted:#97a1ab;
+      --accent: linear-gradient(90deg,var(--glow1),var(--glow2));
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+      --radius:10px; /* near-square but slight rounding like your picture */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; padding:28px;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background:
+        radial-gradient(600px 300px at 8% 10%, rgba(0,214,176,0.02), transparent 10%),
+        radial-gradient(600px 300px at 92% 92%, rgba(0,214,176,0.015), transparent 10%),
+        var(--bg);
+      color:#e6f7ee;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .card{
+      width:92%;
+      max-width:520px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.008));
+      border-radius: var(--radius);
+      padding:22px;
+      border: 2px solid rgba(0,214,176,0.07);
+      box-shadow:
+        0 12px 40px rgba(0,214,176,0.03),
+        inset 0 0 28px rgba(0,214,176,0.02);
+      position:relative;
+    }
+
+    /* outer neon frame (like picture) */
+    .card::before{
+      content:"";
+      position:absolute;
+      inset:-8px;
+      border-radius: calc(var(--radius) + 8px);
+      pointer-events:none;
+      box-shadow: 0 0 40px rgba(0,214,176,0.18), 0 0 8px rgba(0,214,176,0.12) inset;
+      border: 2px solid rgba(0,214,176,0.06);
+    }
+
+    h1{
+      margin:0 0 8px 0;
+      font-size:22px;
+      letter-spacing:0.6px;
+      color: var(--glow1);
+      text-shadow: 0 4px 18px rgba(0,214,176,0.25), 0 0 10px rgba(0,214,176,0.12);
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .subtitle{color:var(--muted);font-size:13px;margin-bottom:12px}
+
+    textarea{
+      width:100%;
+      min-height:120px;
+      resize:vertical;
+      background:#0b1113;
+      border-radius:8px;
+      border: 2px solid rgba(0,214,176,0.06);
+      padding:14px;
+      color:#dfffee;
+      font-family: var(--mono);
+      font-size:14px;
+      outline:none;
+      box-shadow: inset 0 0 18px rgba(0,214,176,0.02);
+    }
+    textarea::placeholder{color: #5f6b6a}
+
+    .btn{
+      width:100%;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      padding:14px 18px;
+      margin-top:12px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:700;
+      color:#03150f;
+      background: linear-gradient(90deg,#00f6b0,#00d3b0);
+      border: none;
+      box-shadow: 0 10px 30px rgba(0,214,176,0.12);
+    }
+
+    .result{
+      margin-top:14px;
+      background:transparent;
+      border-radius:8px;
+      padding:12px;
+      color:var(--muted);
+      border:2px solid rgba(0,214,176,0.06);
+      min-height:56px;
+      font-family:var(--mono);
+      font-size:13px;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+
+    .small-row{display:flex;gap:8px;margin-top:10px}
+    .ghost{background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.03);padding:8px 10px;border-radius:8px;cursor:pointer}
+    .copyOk{color:var(--glow1);font-weight:700}
+
+    @media (max-width:460px){
+      .card{padding:16px}
+      h1{font-size:18px}
+    }
+  </style>
+</head>
+<body>
+  <div class="card" role="application" aria-label="ZERO zlib64 Encoder">
+    <h1>🔌💩 ZERO zlib64 Encoder</h1>
+    <div class="subtitle">এখানে টেক্সট লিখে নিচের Encode বাটন চাপলেই zlib → base64 আউটপুট পাবে</div>
+
+    <label for="input" style="display:block;margin-bottom:8px;color:var(--muted);font-size:13px">Input</label>
+    <textarea id="input" placeholder="Enter text to encode... (UTF-8 supported)"></textarea>
+
+    <button id="encodeBtn" class="btn">🔍 Encode</button>
+
+    <div class="result" id="output" aria-live="polite">🇧🇩 🥳 Encoded Output will appear here...</div>
+
+    <div class="small-row">
+      <button id="copyBtn" class="ghost">Copy</button>
+      <button id="clearBtn" class="ghost">Clear</button>
+      <div id="copyStatus" style="margin-left:auto;color:var(--muted);font-size:13px"></div>
+    </div>
+  </div>
+
+  <script>
+    // helper: base64 for Uint8Array
+    function uint8ToBase64(u8) {
+      // convert to binary string in chunks to avoid stack limits
+      let CHUNK = 0x8000;
+      let index = 0;
+      let result = '';
+      while (index < u8.length) {
+        let slice = u8.subarray(index, Math.min(index + CHUNK, u8.length));
+        result += String.fromCharCode.apply(null, slice);
+        index += CHUNK;
+      }
+      return btoa(result);
+    }
+
+    const inputEl = document.getElementById('input');
+    const outEl = document.getElementById('output');
+    const btn = document.getElementById('encodeBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const status = document.getElementById('copyStatus');
+
+    btn.addEventListener('click', () => {
+      const text = inputEl.value || '';
+      try {
+        // encode UTF-8 string -> bytes
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(text);
+
+        // pako deflate (zlib wrapper)
+        // pako.deflate returns Uint8Array
+        const compressed = pako.deflate(bytes);
+
+        // base64 encode the compressed Uint8Array
+        const b64 = uint8ToBase64(compressed);
+
+        outEl.textContent = b64;
+        status.textContent = '✔️ Encoded';
+        status.style.color = '';
+      } catch (e) {
+        outEl.textContent = 'Error: ' + (e.message || e);
+        status.textContent = '';
+      }
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(outEl.textContent || '');
+        status.textContent = 'Copied ✓';
+        status.style.color = '#00f6b0';
+        setTimeout(()=>{ status.textContent=''; }, 1500);
+      } catch (e) {
+        status.textContent = 'Copy failed';
+        setTimeout(()=>{ status.textContent=''; }, 1500);
+      }
+    });
+
+    clearBtn.addEventListener('click', () => {
+      inputEl.value = '';
+      outEl.textContent = '🇧🇩 🥳 Encoded Output will appear here...';
+      status.textContent = '';
+    });
+
+    // keyboard shortcut: Ctrl/Cmd+Enter
+    inputEl.addEventListener('keydown', (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+        ev.preventDefault();
+        btn.click();
+      }
+    });
+  </script>
+</body>
+</html>
