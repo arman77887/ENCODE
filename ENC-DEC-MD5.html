@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CRYPTICX — Advanced (No Password)</title>
+
+<!-- Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+:root{
+  --accent:#00ffcc;
+  --bg:#000000;
+  --panel:#0f0f10;
+  --panel-light:#161617;
+  --text:#e6fff7;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:18px}
+.container{width:100%;max-width:980px;background:var(--panel);border-radius:12px;padding:20px;border:2px solid rgba(0,255,204,0.12);box-shadow:0 20px 50px rgba(0,0,0,0.7)}
+h1{color:var(--accent);font-size:22px;margin-bottom:12px;text-align:center}
+.grid{display:grid;grid-template-columns:1fr 380px;gap:16px}
+@media (max-width:980px){ .grid{grid-template-columns:1fr} }
+textarea,input,select{width:100%;padding:12px;border-radius:8px;border:2px solid rgba(0,255,204,0.08);background:var(--panel-light);color:var(--accent);outline:none;font-size:14px}
+textarea{min-height:150px;resize:vertical}
+.panel{background:rgba(0,255,204,0.03);padding:12px;border-radius:10px;border:1px solid rgba(0,255,204,0.06)}
+.btn{display:inline-block;padding:10px;border-radius:8px;border:none;background:linear-gradient(45deg,var(--accent),#009999);color:#071014;font-weight:700;cursor:pointer;margin:6px 0;transition:transform .12s ease}
+.btn:hover{transform:translateY(-3px)}
+.btn.small{padding:8px;font-size:13px}
+.row{display:flex;gap:8px}
+.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.name-tag{font-weight:700;color:var(--accent);text-shadow:0 0 6px rgba(0,255,204,0.08);text-align:center;padding:8px;border-radius:6px;background:rgba(0,255,204,0.02)}
+.output{background:var(--panel-light);padding:12px;border-radius:8px;min-height:80px;overflow:auto;color:#fff;white-space:pre-wrap;word-break:break-word;border:1px solid rgba(255,255,255,0.02)}
+.link-list{display:flex;flex-direction:row;gap:12px;margin-top:10px}
+.icon-btn{width:46px;height:46px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:1px solid rgba(0,255,204,0.06);color:var(--accent);cursor:pointer;font-size:20px;transition:transform .12s}
+.icon-btn:hover{transform:scale(1.12)}
+.muted{color:#99bfb7;font-size:13px;margin-top:8px}
+.note{font-size:13px;color:#9fbfb3;margin-top:8px}
+</style>
+</head>
+<body>
+
+<div class="container" role="main">
+  <h1>🔐 CRYPTICX — Advanced (No Password)</h1>
+
+  <div class="grid">
+    <!-- Left: Input & Buttons -->
+    <div>
+      <label class="muted">Input (Text / Base64 / Cipher)</label>
+      <textarea id="textInput" placeholder="এখানে টেক্সট লিখো — encode/decode/hash/encrypt/…"></textarea>
+
+      <div class="row" style="margin-top:10px">
+        <input id="keyInput" placeholder="AES secret key (optional)" />
+        <select id="b64Option" style="width:150px">
+          <option value="utf8">UTF-8</option>
+          <option value="base64">Already Base64</option>
+        </select>
+      </div>
+
+      <div class="panel" style="margin-top:12px;">
+        <div class="controls">
+          <button class="btn small" onclick="zlibEncode()">zlib64 Encode</button>
+          <button class="btn small" onclick="zlibDecode()">zlib64 Decode</button>
+          <button class="btn small" onclick="b64Encode()">Base64 Encode</button>
+
+          <button class="btn small" onclick="b64Decode()">Base64 Decode</button>
+          <button class="btn small" onclick="hashMD5()">MD5 Hash</button>
+          <button class="btn small" onclick="sha256Fingerprint()">SHA-256 Fingerprint</button>
+
+          <button class="btn small" onclick="compressThenAES()">Compress → AES Encrypt</button>
+          <button class="btn small" onclick="AESThenDecompress()">AES Decrypt → Decompress</button>
+          <button class="btn small" onclick="hashAndEncode()">MD5 → Base64</button>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn" onclick="copyOutput()">📋 Copy Output</button>
+          <button class="btn" onclick="clearAll()">🧹 Clear</button>
+        </div>
+
+        <div class="note">নোট: MD5 irreversible; AES key অবশ্যই মনে রাখো; বড় টেক্সটের জন্য অপেক্ষা করতে হতে পারে।</div>
+      </div>
+    </div>
+
+    <!-- Right: Output & Social -->
+    <div>
+      <div class="name-tag">CRYPTICX</div>
+
+      <div style="margin-top:12px">
+        <label class="muted">Output</label>
+        <div id="outputText" class="output"></div>
+      </div>
+
+      <div style="margin-top:12px">
+        <input id="md5Check" placeholder="MD5 to verify (paste here)" />
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn small" onclick="verifyMD5()">Verify MD5</button>
+          <button class="btn small" onclick="verifyMD5Prompt()">Prompt Verify</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label class="muted">Social</label>
+        <div class="link-list" id="linksArea"></div>
+      </div>
+
+      <div class="muted" style="margin-top:12px">Social icons only — click icon to open profile.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Helper converters (safe for large data & iOS) ----
+function uint8ToWordArray(u8){
+  var words = [], i = 0;
+  for (; i < u8.length; i += 4) {
+    words.push(
+      ((u8[i]     || 0) << 24) |
+      ((u8[i + 1] || 0) << 16) |
+      ((u8[i + 2] || 0) << 8)  |
+      ((u8[i + 3] || 0))
+    );
+  }
+  return CryptoJS.lib.WordArray.create(words, u8.length);
+}
+
+function wordArrayToUint8(wordArray) {
+  var len = wordArray.sigBytes;
+  var words = wordArray.words;
+  var u8 = new Uint8Array(len);
+  var idx = 0;
+  for (var i = 0; i < words.length; i++) {
+    var w = words[i];
+    if (idx < len) u8[idx++] = (w >> 24) & 0xFF;
+    if (idx < len) u8[idx++] = (w >> 16) & 0xFF;
+    if (idx < len) u8[idx++] = (w >> 8) & 0xFF;
+    if (idx < len) u8[idx++] = w & 0xFF;
+  }
+  return u8;
+}
+
+function uint8ToBase64(u8) {
+  var CHUNK = 0x8000;
+  var i = 0;
+  var len = u8.length;
+  var str = '';
+  while (i < len) {
+    var chunk = u8.subarray(i, Math.min(i + CHUNK, len));
+    for (var j = 0; j < chunk.length; j++) str += String.fromCharCode(chunk[j]);
+    i += CHUNK;
+  }
+  return btoa(str);
+}
+
+function base64ToUint8(b64) {
+  var bin = atob(b64);
+  var u8 = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
+
+function setOutput(txt){ document.getElementById('outputText').textContent = txt; }
+function showErr(title, text, type='error'){ Swal.fire(title, text, type); }
+
+// ---- zlib64 Encode / Decode ----
+function zlibEncode(){
+  try {
+    var input = document.getElementById('textInput').value;
+    if (!input) { showErr('❌ Empty', 'Please enter text to encode.'); return; }
+    var compressed = pako.deflate(input);
+    var b64 = uint8ToBase64(compressed);
+    setOutput(b64);
+    Swal.fire('✅ Done','zlib64 encode হয়েছে','success');
+  } catch (e) { console.error(e); showErr('❌ Failed','zlib encode error'); }
+}
+
+function zlibDecode(){
+  try {
+    var input = document.getElementById('textInput').value.trim();
+    if (!input) { showErr('❌ Empty', 'Paste Base64 zlib data to decode.'); return; }
+    var u8 = base64ToUint8(input);
+    var out = pako.inflate(u8, { to: 'string' });
+    setOutput(out);
+    Swal.fire('✅ Done','zlib64 decode সফল হয়েছে','success');
+  } catch (e) { console.error(e); showErr('❌ Failed','Invalid zlib64 data or decompress error'); }
+}
+
+// ---- Base64 Encode / Decode (UTF-8 safe) ----
+function b64Encode(){
+  try {
+    var input = document.getElementById('textInput').value;
+    if (!input) { showErr('❌ Empty','Enter text to Base64-encode.'); return; }
+    var b = btoa(unescape(encodeURIComponent(input)));
+    setOutput(b);
+    Swal.fire('✅ Done','Base64 encode সম্পন্ন','success');
+  } catch (e) { console.error(e); showErr('❌ Failed','Base64 encode error'); }
+}
+
+function b64Decode(){
+  try {
+    var input = document.getElementById('textInput').value.trim();
+    if (!input) { showErr('❌ Empty','Paste Base64 text to decode.'); return; }
+    var s = decodeURIComponent(escape(atob(input)));
+    setOutput(s);
+    Swal.fire('✅ Done','Base64 decode সম্পন্ন','success');
+  } catch (e) { console.error(e); showErr('❌ Failed','Invalid Base64 string'); }
+}
+
+// ---- MD5 / Verify / MD5->Base64 ----
+function hashMD5(){
+  var input = document.getElementById('textInput').value;
+  if (!input) { showErr('❌ Empty','Enter text to hash.'); return; }
+  var h = CryptoJS.MD5(input).toString(CryptoJS.enc.Hex);
+  setOutput(h);
+  Swal.fire('✅ Done','MD5 generated','success');
+}
+
+function verifyMD5(){
+  var input = document.getElementById('textInput').value;
+  var md5t = document.getElementById('md5Check').value.trim().toLowerCase();
+  if (!input || !md5t) { showErr('❌ Empty','Enter both text and MD5 to verify.'); return; }
+  var h = CryptoJS.MD5(input).toString(CryptoJS.enc.Hex);
+  if (h === md5t) Swal.fire('✅ Match','MD5 মিলেছে','success'); else Swal.fire('❌ No match','MD5 মিললো না','error');
+}
+
+function verifyMD5Prompt(){
+  Swal.fire({title:'Paste MD5 to verify',input:'text',showCancelButton:true}).then(res=>{
+    if(!res.isConfirmed) return;
+    document.getElementById('md5Check').value = (res.value||'').trim();
+    verifyMD5();
+  });
+}
+
+function hashAndEncode(){
+  var input = document.getElementById('textInput').value;
+  if(!input){ showErr('❌ Empty','Enter text to process.'); return; }
+  var md5 = CryptoJS.MD5(input).toString(CryptoJS.enc.Hex);
+  var b64 = btoa(md5);
+  setOutput(b64);
+  Swal.fire('✅ Done','MD5 created and Base64-encoded','success');
+}
+
+// ---- SHA-256 Fingerprint (colon-separated uppercase) ----
+function sha256Fingerprint(){
+  var input = document.getElementById('textInput').value;
+  if(!input){ showErr('❌ Empty','Enter text to fingerprint.'); return; }
+  var hash = CryptoJS.SHA256(input).toString(CryptoJS.enc.Hex);
+  var parts = hash.match(/.{1,2}/g).join(':').toUpperCase();
+  setOutput(parts);
+  Swal.fire('✅ Done','SHA-256 fingerprint generated','success');
+}
+
+// ---- Compress -> AES encrypt (CryptoJS WordArray handling) ----
+function compressThenAES(){
+  try {
+    var text = document.getElementById('textInput').value;
+    var key = document.getElementById('keyInput').value;
+    if (!text || !key) { showErr('❌ Empty','Enter text and AES key.'); return; }
+
+    var compressed = pako.deflate(text); // Uint8Array
+    var wa = uint8ToWordArray(compressed);
+
+    // Encrypt WordArray with passphrase (CryptoJS handles passphrase -> key)
+    var cipher = CryptoJS.AES.encrypt(wa, key).toString(); // Base64 ciphertext
+    setOutput(cipher);
+    Swal.fire('🔒 Encrypted','Compress + AES encryption সম্পন্ন','success');
+  } catch (e) { console.error(e); showErr('❌ Failed','Encrypt/compress error'); }
+}
+
+function AESThenDecompress(){
+  try {
+    // try input first, otherwise use output box
+    var cipher = (document.getElementById('textInput').value || '').trim() || document.getElementById('outputText').textContent.trim();
+    var key = document.getElementById('keyInput').value;
+    if (!cipher || !key) { showErr('❌ Empty','Provide ciphertext and AES key.'); return; }
+
+    var decryptedWA = CryptoJS.AES.decrypt(cipher, key);
+    var u8 = wordArrayToUint8(decryptedWA);
+    var plain = pako.inflate(u8, { to: 'string' });
+    setOutput(plain);
+    Swal.fire('🔓 Decrypted','AES decrypt + decompress সফল','success');
+  } catch (e) { console.error(e); showErr('❌ Failed','Decrypt/decompress error — check key or ciphertext'); }
+}
+
+// ---- Social links (obfuscated base64 URLs) ----
+const SOCIAL = [
+  {type:'facebook', urlB64:'aHR0cHM6Ly9mYWNlYm9vay5jb20vbW9oYW1tYWQuYXJtYW44'},
+  {type:'telegram', urlB64:'aHR0cHM6Ly90Lm1lL0pVTklPUl9JTlZFU1RJR0FUT1I='}
+];
+
+function renderLinks(){
+  const area = document.getElementById('linksArea');
+  area.innerHTML = '';
+  SOCIAL.forEach(s=>{
+    const btn = document.createElement('button');
+    btn.className = 'icon-btn';
+    btn.title = s.type === 'facebook' ? 'Facebook' : 'Telegram';
+    btn.innerHTML = s.type === 'facebook' ? '📘' : '✈️';
+    btn.onclick = ()=> {
+      var url = atob(s.urlB64);
+      // open in new tab
+      window.open(url, '_blank', 'noopener');
+    };
+    area.appendChild(btn);
+  });
+}
+
+// ---- Copy / Clear ----
+function copyOutput(){
+  var txt = document.getElementById('outputText').textContent;
+  if (!txt) { showErr('❌ Empty','কপি করার জন্য আউটপুট নেই'); return; }
+  navigator.clipboard.writeText(txt).then(()=> Swal.fire('📋 Copied','Output কপি করা হয়েছে','success'))
+  .catch(err => { console.error(err); showErr('❌ Failed','Copy failed — check permissions'); });
+}
+
+function clearAll(){
+  document.getElementById('textInput').value = '';
+  document.getElementById('outputText').textContent = '';
+  document.getElementById('keyInput').value = '';
+  document.getElementById('md5Check').value = '';
+}
+
+// ---- Init ----
+document.addEventListener('DOMContentLoaded', function(){
+  renderLinks();
+  // show small hint
+  // Swal.fire('Tip','Use AES key carefully. This is a client-side tool.', 'info');
+});
+</script>
+
+</body>
+</html>
