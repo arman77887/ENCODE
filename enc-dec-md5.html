@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CRYPTICX — Advanced zlib64 / MD5 / AES Tool</title>
+
+<!-- Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+<!-- Styles (dark theme, matching তোমার আগের থিম) -->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+  :root { --accent:#00ffcc; --bg:#0d1117; --panel:rgba(22,27,34,0.9); }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Poppins',sans-serif;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+  .card{width:100%;max-width:720px;background:var(--panel);border-radius:12px;padding:22px;border:2px solid rgba(0,255,204,0.18);box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+  h1{color:var(--accent);text-shadow:0 0 8px rgba(0,255,204,0.12);font-size:20px;margin-bottom:12px}
+  .grid{display:grid;grid-template-columns:1fr 320px;gap:14px}
+  .full{grid-column:1/-1}
+  textarea, input, select{width:100%;padding:12px;border-radius:8px;border:2px solid var(--accent);background:rgba(31,41,55,0.85);color:var(--accent);outline:none;font-size:14px}
+  textarea{min-height:140px;resize:vertical}
+  .btn{display:inline-block;width:100%;padding:10px;border-radius:8px;border:none;background:linear-gradient(45deg,var(--accent),#009999);color:#111;font-weight:700;cursor:pointer;margin-top:8px}
+  .small{padding:8px;font-size:14px}
+  .col{display:flex;flex-direction:column;gap:8px}
+  .name-tag{font-weight:700;color:var(--accent);text-shadow:0 0 6px rgba(0,255,204,0.15);text-align:center;padding:6px 0;border-radius:6px}
+  pre{background:rgba(12,15,20,0.6);padding:12px;border-radius:8px;overflow:auto;color:#fff;white-space:pre-wrap;word-break:break-word}
+  .controls{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .muted{color:#bfc7c9;font-size:13px;margin-top:6px}
+  .row{display:flex;gap:8px}
+  .copy-btn{background:transparent;border:2px solid var(--accent);color:var(--accent);padding:8px;border-radius:8px;cursor:pointer}
+  @media (max-width:800px){ .grid{grid-template-columns:1fr} .card{padding:16px} }
+</style>
+</head>
+<body>
+
+<div class="card" role="main">
+  <h1>🔐 CRYPTICX — Advanced zlib64 · MD5 · AES Tool</h1>
+
+  <div class="grid">
+    <!-- Left: primary input & actions -->
+    <div class="col">
+      <label class="muted">Input / Text (এখানে টেক্সট বা Base64/Encrypted লিখবে)</label>
+      <textarea id="textInput" placeholder="এখানে টেক্সট লিখো — encode/decode/hash/encrypt-এর জন্য"></textarea>
+
+      <div class="row">
+        <input id="keyInput" placeholder="Secret key (AES-এর জন্য) — দিতে পারো" />
+        <select id="encodingMode" title="zlib base64 mode" style="width:160px">
+          <option value="utf8">Text (UTF-8)</option>
+          <option value="base64">Already Base64</option>
+        </select>
+      </div>
+
+      <div class="controls">
+        <button class="btn small" onclick="zlibEncode()">🟢 zlib64 Encode</button>
+        <button class="btn small" onclick="zlibDecode()">🔎 zlib64 Decode</button>
+
+        <button class="btn small" onclick="hashMD5()">🔐 MD5 Hash</button>
+        <button class="btn small" onclick="verifyMD5Prompt()">✅ Verify MD5</button>
+
+        <button class="btn small" onclick="compressThenAES()">🔒 Compress → AES Encrypt</button>
+        <button class="btn small" onclick="AESThenDecompress()">🔓 AES Decrypt → Decompress</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="copy-btn" onclick="copyOutput()">📋 Copy Output</button>
+        <button class="copy-btn" onclick="clearAll()">🧹 Clear</button>
+      </div>
+
+      <div class="muted">নোট: MD5 থেকে রিভার্স করা যাবে না; AES-এর জন্য একই key ব্যবহার করতে হবে।</div>
+    </div>
+
+    <!-- Right: output & verify -->
+    <div class="col">
+      <div class="name-tag">CRYPTICX</div>
+
+      <div style="margin-top:10px">
+        <label class="muted">Output</label>
+        <pre id="outputText" aria-live="polite"></pre>
+
+        <div style="margin-top:8px">
+          <input id="md5Check" placeholder="MD5 to verify against (পেস্ট কর)" />
+          <button class="btn small" style="margin-top:8px" onclick="verifyMD5()">🔎 Verify MD5 Now</button>
+        </div>
+
+        <div style="margin-top:10px; font-size:13px; color:#bfc7c9">
+          Usage tips:
+          <ul style="margin:6px 0 0 18px; color:#9fbfb3">
+            <li>zlib64 Encode: টেক্সট → zlib(deflate) → Base64</li>
+            <li>zlib64 Decode: Base64 →inflate→ UTF-8 টেক্সট</li>
+            <li>Compress→AES: টেক্সট→deflate→ AES encrypt (ciphertext Base64)</li>
+            <li>AES→Decompress: Base64 ciphertext → AES decrypt → inflate → টেক্সট</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPT: logic (Bangla comments) -->
+<script>
+/*
+  Helper utilities:
+  - uint8Array <-> CryptoJS WordArray conversions
+  - binary <-> base64 helpers
+*/
+
+// Uint8Array -> CryptoJS WordArray
+function uint8ToWordArray(u8) {
+  // CryptoJS.lib.WordArray.create accepts typed arrays in many builds,
+  // but to be safe we construct manually.
+  var words = [];
+  for (var i = 0; i < u8.length; i += 4) {
+    words.push(
+      ((u8[i]     || 0) << 24) |
+      ((u8[i + 1] || 0) << 16) |
+      ((u8[i + 2] || 0) << 8)  |
+      ((u8[i + 3] || 0))
+    );
+  }
+  return CryptoJS.lib.WordArray.create(words, u8.length);
+}
+
+// CryptoJS WordArray -> Uint8Array
+function wordArrayToUint8(wordArray) {
+  var len = wordArray.sigBytes;
+  var words = wordArray.words;
+  var u8 = new Uint8Array(len);
+  var idx = 0;
+  for (var i = 0; i < words.length; i++) {
+    var w = words[i];
+    u8[idx++] = (w >> 24) & 0xFF;
+    if (idx >= len) break;
+    u8[idx++] = (w >> 16) & 0xFF;
+    if (idx >= len) break;
+    u8[idx++] = (w >> 8) & 0xFF;
+    if (idx >= len) break;
+    u8[idx++] = w & 0xFF;
+    if (idx >= len) break;
+  }
+  return u8;
+}
+
+// Binary (Uint8Array) -> base64 (browser safe)
+function uint8ToBase64(u8) {
+  // chunk to avoid call stack issues
+  var CHUNK_SIZE = 0x8000;
+  var index = 0;
+  var length = u8.length;
+  var result = '';
+  while (index < length) {
+    var chunk = u8.subarray(index, Math.min(index + CHUNK_SIZE, length));
+    result += String.fromCharCode.apply(null, chunk);
+    index += CHUNK_SIZE;
+  }
+  return btoa(result);
+}
+
+// base64 -> Uint8Array
+function base64ToUint8(b64) {
+  var binary = atob(b64);
+  var len = binary.length;
+  var u8 = new Uint8Array(len);
+  for (var i = 0; i < len; i++) u8[i] = binary.charCodeAt(i);
+  return u8;
+}
+
+// Utility: set output
+function setOutput(text) {
+  document.getElementById('outputText').textContent = text;
+}
+
+// Utility: show alert
+function showErr(title, text, type='error') {
+  Swal.fire(title, text, type);
+}
+
+// zlib64 Encode: text -> deflate -> base64
+function zlibEncode() {
+  try {
+    var input = document.getElementById('textInput').value;
+    if (!input) { showErr('❌ Empty', 'Please enter text to encode.'); return; }
+    // UTF-8 string -> deflate -> Uint8Array
+    var compressed = pako.deflate(input);
+    var b64 = uint8ToBase64(compressed);
+    setOutput(b64);
+    Swal.fire('✅ Done', 'zlib64 encoding সম্পন্ন হয়েছে', 'success');
+  } catch (e) {
+    console.error(e);
+    showErr('❌ Encode failed', 'zlib encode এর সময় সমস্যা হয়েছে।');
+  }
+}
+
+// zlib64 Decode: base64 -> inflate -> text
+function zlibDecode() {
+  try {
+    var input = document.getElementById('textInput').value.trim();
+    if (!input) { showErr('❌ Empty', 'Please paste Base64 zlib data to decode.'); return; }
+    var u8 = base64ToUint8(input);
+    var out = pako.inflate(u8, { to: 'string' }); // utf-8 string
+    setOutput(out);
+    Swal.fire('✅ Done', 'zlib64 decode সফল হয়েছে', 'success');
+  } catch (e) {
+    console.error(e);
+    showErr('❌ Decode failed', 'Invalid zlib64 string বা ডিকম্প্রেস করা যাচ্ছে না।');
+  }
+}
+
+// MD5 hash
+function hashMD5() {
+  var input = document.getElementById('textInput').value;
+  if (!input) { showErr('❌ Empty', 'Please enter text to hash.'); return; }
+  var h = CryptoJS.MD5(input).toString(CryptoJS.enc.Hex);
+  setOutput(h);
+  Swal.fire('✅ Done', 'MD5 জেনারেট করা হয়েছে', 'success');
+}
+
+// Verify MD5 (from md5Check input)
+function verifyMD5() {
+  var input = document.getElementById('textInput').value;
+  var md5target = document.getElementById('md5Check').value.trim().toLowerCase();
+  if (!input || !md5target) { showErr('❌ Empty', 'Enter both text and MD5 to verify.'); return; }
+  var h = CryptoJS.MD5(input).toString(CryptoJS.enc.Hex);
+  if (h === md5target) {
+    Swal.fire('✅ Verified', 'MD5 মিলেছে (Match).', 'success');
+  } else {
+    Swal.fire('❌ Mismatch', 'MD5 মিললো না (Not match).', 'error');
+  }
+}
+
+// Quick prompt verify (asks user to paste MD5)
+function verifyMD5Prompt() {
+  Swal.fire({
+    title: 'MD5 verify',
+    input: 'text',
+    inputLabel: 'Paste MD5 here to verify',
+    showCancelButton: true
+  }).then(res => {
+    if (!res.isConfirmed) return;
+    document.getElementById('md5Check').value = (res.value || '').trim();
+    verifyMD5();
+  });
+}
+
+// Compress -> AES encrypt
+function compressThenAES() {
+  try {
+    var text = document.getElementById('textInput').value;
+    var key = document.getElementById('keyInput').value;
+    if (!text || !key) { showErr('❌ Empty', 'Enter both text and AES key.'); return; }
+
+    // compress to Uint8Array
+    var compressed = pako.deflate(text);
+
+    // convert to CryptoJS WordArray
+    var wa = uint8ToWordArray(compressed);
+
+    // AES encrypt the WordArray directly with password key (CryptoJS does PBKDF inside if string)
+    var cipher = CryptoJS.AES.encrypt(wa, key).toString(); // ciphertext (Base64)
+
+    setOutput(cipher);
+    Swal.fire('🔒 Encrypted', 'Compress + AES encryption সম্পন্ন হয়েছে', 'success');
+  } catch (e) {
+    console.error(e);
+    showErr('❌ Encrypt failed', 'Compression/Encryption এর সময় সমস্যা হয়েছে।');
+  }
+}
+
+// AES decrypt -> decompress
+function AESThenDecompress() {
+  try {
+    var cipherB64 = document.getElementById('textInput').value.trim() || document.getElementById('outputText').textContent.trim();
+    var key = document.getElementById('keyInput').value;
+    if (!cipherB64 || !key) { showErr('❌ Empty', 'Enter ciphertext (or place in Input) and AES key.'); return; }
+
+    // Decrypt: returns WordArray (raw bytes)
+    var decryptedWA = CryptoJS.AES.decrypt(cipherB64, key);
+    // Convert WordArray -> Uint8Array
+    var u8 = wordArrayToUint8(decryptedWA);
+
+    // Inflate (decompress)
+    var plain = pako.inflate(u8, { to: 'string' });
+    setOutput(plain);
+    Swal.fire('🔓 Decrypted', 'AES decrypt + decompress সফল হয়েছে', 'success');
+  } catch (e) {
+    console.error(e);
+    showErr('❌ Decrypt failed', 'Decryption or decompression এ সমস্যা ঘটেছে (সঠিক key ব্যবহার করো)।');
+  }
+}
+
+// Copy output to clipboard
+function copyOutput() {
+  var out = document.getElementById('outputText').textContent;
+  if (!out) { showErr('❌ Empty', 'কপি করার জন্য আউটপুট নেই।'); return; }
+  navigator.clipboard.writeText(out).then(() => {
+    Swal.fire('📋 Copied', 'Output কপিয় করা হয়েছে clipboard-এ।', 'success');
+  }).catch(err => {
+    console.error(err);
+    showErr('❌ Copy failed', 'কপিতে সমস্যা হয়েছে। ব্রাউজার অনুমতি চেক করো।');
+  });
+}
+
+// Clear fields
+function clearAll() {
+  document.getElementById('textInput').value = '';
+  document.getElementById('outputText').textContent = '';
+  document.getElementById('md5Check').value = '';
+  document.getElementById('keyInput').value = '';
+  Swal.fire('🧹 Cleared', 'সব ইনপুট এবং আউটপুট ক্লিয়ার করা হয়েছে।', 'info');
+}
+</script>
+
+</body>
+</html>
