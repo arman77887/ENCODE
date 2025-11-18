@@ -7,11 +7,11 @@ from pathlib import Path
 def setup_auto_banner():
     # Get current script directory
     script_dir = Path(__file__).parent
-    banner_file = script_dir / "haq_banner.py"
+    banner_file = script_dir / "auto_update_banner.py"
     
     # Check if banner file exists
     if not banner_file.exists():
-        print("❌ Error: haq_banner.py not found!")
+        print("❌ Error: auto_update_banner.py not found!")
         return False
     
     # Make banner executable
@@ -30,13 +30,13 @@ def setup_auto_banner():
         existing_content = profile_path.read_text()
     
     # Check if already installed
-    if "haq_banner.py" in existing_content:
+    if "auto_update_banner.py" in existing_content:
         print("⚠️  Banner already installed in .profile")
         return True
     
     # Add auto-start code
     auto_start_code = f"""
-# Haq Cyber Squad Auto Banner
+# Crypticx Auto Banner
 if [ -f "{banner_file}" ]; then
     python3 "{banner_file}"
 fi
@@ -54,7 +54,7 @@ fi
 def test_banner():
     """Test the banner installation"""
     script_dir = Path(__file__).parent
-    banner_file = script_dir / "haq_banner.py"
+    banner_file = script_dir / "auto_update_banner.py"
     
     if banner_file.exists():
         print("🚀 Testing banner...")
@@ -63,7 +63,7 @@ def test_banner():
         print("❌ Banner file not found!")
 
 if __name__ == "__main__":
-    print("🏴 Haq Cyber Squad Auto Setup")
+    print("🏴 Crypticx Auto Setup")
     print("═" * 40)
     
     if setup_auto_banner():
